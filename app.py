@@ -1,8 +1,10 @@
-from flask import Flask, render_template_string, request, redirect, url_for
+from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory
 from datetime import datetime, timedelta
 import csv
 import os
-
+@app.route('/icon.png')
+def icon():
+    return send_from_directory(os.getcwd(), 'icon.png')
 app = Flask(__name__)
 LOG_FILE = 'logs.csv'
 
@@ -56,7 +58,12 @@ def index():
             tonpuku_wait = f"(あと{diff.seconds//3600}h{(diff.seconds//60)%60}m)"
 
     return render_template_string(f"""
-    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}</head>
+    <!DOCTYPE html><html><head># --- index関数の中のHTML部分 ---
+# <head>のすぐ下に以下の一行を追加してください
+# <link rel="apple-touch-icon" href="/icon.png">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}
+    # app.py の中の HTML部分（<head>の中）に追加してください
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.png') }}"></head>
     <body><div class="container">
         <h1>🌸 薬マネ 🌸</h1>
         <div style="font-size:1.1rem; color:#ffb7c5; font-weight:bold; margin-bottom:20px;">
@@ -112,5 +119,6 @@ def delete(name):
     save_logs(list(reversed(new))); return redirect(url_for('index'))
 
 if __name__ == '__main__': app.run()
+
 
 
