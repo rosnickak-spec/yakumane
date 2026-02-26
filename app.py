@@ -1,7 +1,7 @@
-import os
-import csv
+from flask import Flask, render_template_string, request, redirect, url_for
 from datetime import datetime, timedelta
-from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory
+import csv
+import os
 
 app = Flask(__name__)
 LOG_FILE = 'logs.csv'
@@ -18,14 +18,22 @@ def save_logs(logs):
         writer.writeheader()
         writer.writerows(logs)
 
-# お薬の名前
 MEDICINES = ["コンサ1", "コンサ2", "抑肝散", "頓服"]
 
-@app.route('/icon.png')
-def icon_file():
-    if os.path.exists('icon.png'):
-        return send_from_directory(os.getcwd(), 'icon.png')
-    return "Icon not found", 404
+# --- 共通のデザイン（CSS） ---
+COMMON_STYLE = """
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+    body { font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; color: #5d5d5d; }
+    .container { max-width: 400px; margin: auto; }
+    h1 { color: #ff8fb1; font-size: 1.8rem; }
+    .card { background: white; padding: 12px; border-radius: 20px; box-shadow: 0 8px 15px rgba(255, 143, 177, 0.1); margin-bottom: 12px; border: 2px solid #ffe4e9; }
+    .btn { width: 100%; font-size: 18px; padding: 18px; background: #87ceeb; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: 700; }
+    .btn.sub { background: #ffb7c5; margin-top: 20px; font-size: 14px; padding: 10px; }
+    .history-card { text-align: left; background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 5px solid #ff8fb1; }
+    .date-title { font-weight: bold; color: #ff8fb1; border-bottom: 1px solid #ffe4e9; margin-bottom: 8px; }
+</style>
+"""
 
 @app.route('/')
 def index():
@@ -36,6 +44,7 @@ def index():
     taken_names = [log['name'] for log in today_logs]
     all_clear = all(m in taken_names for m in MEDICINES[:3])
     
+    # 頓服チェック（省略版）
     tonpuku_wait = ""
     can_t = True
     t_logs = [l for l in logs if l['name'] == "頓服"]
@@ -47,80 +56,44 @@ def index():
             tonpuku_wait = f"(あと{diff.seconds//3600}h{(diff.seconds//60)%60}m)"
 
     return render_template_string(f"""
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>薬マネ</title>
-        <link rel="apple-touch-icon" href="/icon.png">
-        <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
-        <style>
-            body {{ font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; color: #5d5d5d; }}
-            .container {{ max-width: 400px; margin: auto; }}
-            h1 {{ color: #ff8fb1; font-size: 1.8rem; }}
-            .card {{ background: white; padding: 12px; border-radius: 20px; box-shadow: 0 8px 15px rgba(255, 143, 177, 0.1); margin-bottom: 12px; border: 2px solid #ffe4e9; }}
-            .btn {{ width: 100%; font-size: 18px; padding: 18px; background: #87ceeb; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: 700; touch-action: manipulation; }}
-            .btn.sub {{ background: #ffb7c5; margin-top: 20px; font-size: 14px; padding: 10px; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🌸 薬マネ 🌸</h1>
-            <div style="font-size:1.1rem; color:#ffb7c5; font-weight:bold; margin-bottom:20px;">
-                {"<div style='color:#ff6b81; animation:heartBeat 1.5s infinite;'>💖 全完了！ 💖</div>" if all_clear else "きょうも ぼちぼち のもうね"}
-            </div>
-            {"".join([f'''
-            <div class="card">
-                <form action="/record" method="post">
-                    <input type="hidden" name="med_name" value="{m}">
-                    <button type="button" class="btn" 
-                        onmousedown="start_press('{m}')" onmouseup="end_press()"
-                        ontouchstart="start_press('{m}')" ontouchend="end_press()"
-                        style="background:{"#e0e0e0" if (m in taken_names and m!="頓服") else ("#ff8fb1" if m=="頓服" and can_t else ("#f3d1d9" if m=="頓服" and not can_t else "#87ceeb"))}; color:{"#999" if (m in taken_names and m!="頓服") else "white"}">
-                        {m} {"(済)" if (m in taken_names and m!="頓服") else ""} {tonpuku_wait if m=="頓服" and not can_t else ""}
-                    </button>
-                </form>
-            </div>
-            ''' for m in MEDICINES])}
-            <button class="btn sub" onclick="location.href='/history'">📅 1週間のきろくを見る</button>
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}<link rel="apple-touch-icon" href="icon.png"></head>
+    <body><div class="container">
+        <h1>🌸 薬マネ 🌸</h1>
+        <div style="font-size:1.1rem; color:#ffb7c5; font-weight:bold; margin-bottom:20px;">
+            {"<div style='color:#ff6b81; animation:heartBeat 1.5s infinite;'>💖 全完了！ 💖</div>" if all_clear else "きょうも ぼちぼち のもうね"}
         </div>
-        <script>
-            let t; let lp = false;
-            function start_press(n) {{ lp = false; t = setTimeout(() => {{ lp = true; if(confirm(n + " けす？")) location.href="/delete/"+encodeURIComponent(n); }}, 800); }}
-            function end_press() {{ 
-                clearTimeout(t); 
-                if(!lp) {{ 
-                    const b = event.currentTarget; 
-                    if(!b.style.background.includes("rgb(224, 224, 224)") && !b.style.background.includes("rgb(243, 209, 217)")) b.closest('form').submit(); 
-                }} 
-            }}
-            window.oncontextmenu = function(e) {{ e.preventDefault(); return false; }};
-        </script>
+        {"".join([f'<div class="card"><form action="/record" method="post"><input type="hidden" name="med_name" value="{m}"><button type="button" class="btn {"done" if (m in taken_names and m!="頓服") else ("tonpuku" if (m=="頓服" and can_t) else ("wait" if (m=="頓服" and not can_t) else ""))}" onmousedown="start_press(\'{m}\')" onmouseup="end_press()" ontouchstart="start_press(\'{m}\')" ontouchend="end_press()" style="background:{"#e0e0e0" if (m in taken_names and m!="頓服") else ("#ff8fb1" if m=="頓服" and can_t else ("#f3d1d9" if m=="頓服" and not can_t else "#87ceeb"))}">{m} {"(済)" if (m in taken_names and m!="頓服") else ""} {tonpuku_wait if m=="頓服" and not can_t else ""}</button></form></div>' for m in MEDICINES])}
+        <button class="btn sub" onclick="location.href='/history'">📅 1週間のきろくを見る</button>
+    </div>
+    <script>
+        let t; let lp = false;
+        function start_press(n) {{ lp = false; t = setTimeout(() => {{ lp = true; if(confirm(n + " けす？")) location.href="/delete/"+encodeURIComponent(n); }}, 800); }}
+        function end_press() {{ clearTimeout(t); if(!lp) {{ const b = event.currentTarget; if(!b.style.background.includes("rgb(224, 224, 224)") && !b.style.background.includes("rgb(243, 209, 217)")) b.closest('form').submit(); }} }}
+    </script>
     </body></html>
     """)
 
 @app.route('/history')
 def history():
-    logs = load_logs(); history_data = {}
+    logs = load_logs()
+    # 過去7日間の日付リストを作成
+    history_data = {}
     for i in range(7):
         d = (datetime.now() - timedelta(days=i)).strftime("%Y/%m/%d")
         history_data[d] = [log for log in logs if log['date'] == d]
+
     return render_template_string(f"""
-    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="apple-touch-icon" href="/icon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
-    <style>
-        body {{ font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; color: #5d5d5d; }}
-        .container {{ max-width: 400px; margin: auto; }}
-        h1 {{ color: #ff8fb1; font-size: 1.8rem; }}
-        .history-card {{ text-align: left; background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 5px solid #ff8fb1; }}
-        .date-title {{ font-weight: bold; color: #ff8fb1; border-bottom: 1px solid #ffe4e9; margin-bottom: 8px; }}
-        .btn {{ width: 100%; font-size: 18px; padding: 18px; background: #ffb7c5; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: 700; }}
-    </style></head>
-    <body><div class="container"><h1>📅 1週間のきろく</h1>
-    {"".join([f'<div class="history-card"><div class="date-title">{date}</div>{"".join([f"<div>・{l[\'time\']} {l[\'name\']}</div>" for l in day_logs]) if day_logs else "<div style=\'color:#ccc;\'>記録なし</div>"}</div>' for date, day_logs in history_data.items()])}
-    <button class="btn" onclick="location.href='/'">もどる</button></div></body></html>
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}</head>
+    <body><div class="container">
+        <h1>📅 1週間のきろく</h1>
+        {"".join([f'''
+        <div class="history-card">
+            <div class="date-title">{date}</div>
+            {"".join([f"<div>・{l['time']} {l['name']}</div>" for l in day_logs]) if day_logs else "<div style='color:#ccc;'>記録なし</div>"}
+        </div>
+        ''' for date, day_logs in history_data.items()])}
+        <button class="btn" style="background:#ffb7c5;" onclick="location.href='/'">もどる</button>
+    </div></body></html>
     """)
 
 @app.route('/record', methods=['POST'])
@@ -138,7 +111,4 @@ def delete(name):
         new.append(l)
     save_logs(list(reversed(new))); return redirect(url_for('index'))
 
-# --- ここが最重要：Render専用の起動コード ---
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == '__main__': app.run()
