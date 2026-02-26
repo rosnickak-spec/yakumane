@@ -18,7 +18,7 @@ def save_logs(logs):
         writer.writeheader()
         writer.writerows(logs)
 
-MEDICINES = ["朝の薬(1)", "朝の薬(2)", "朝の薬(3)", "頓服"]
+MEDICINES = ["コンサ18‐1", "コンサ18‐2", "抑肝散", "頓服"]
 
 # --- 共通のデザイン（CSS） ---
 COMMON_STYLE = """
@@ -112,3 +112,4 @@ def delete(name):
     save_logs(list(reversed(new))); return redirect(url_for('index'))
 
 if __name__ == '__main__': app.run()
+
