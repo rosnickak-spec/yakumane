@@ -4,152 +4,111 @@ import csv
 import os
 
 app = Flask(__name__)
-
-# 保存するファイルの名前
 LOG_FILE = 'logs.csv'
 
-# --- データの読み書き関数 ---
 def load_logs():
-    """ファイルから記録を読み込む"""
-    if not os.path.exists(LOG_FILE):
-        return []
+    if not os.path.exists(LOG_FILE): return []
     with open(LOG_FILE, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        return list(reader)
+        return list(csv.DictReader(f))
 
 def save_logs(logs):
-    """ファイルに記録を書き込む"""
     with open(LOG_FILE, 'w', encoding='utf-8', newline='') as f:
         fieldnames = ['date', 'time', 'name']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(logs)
 
-# 薬の種類
 MEDICINES = ["朝の薬(1)", "朝の薬(2)", "朝の薬(3)", "頓服"]
+
+# --- 共通のデザイン（CSS） ---
+COMMON_STYLE = """
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+    body { font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; color: #5d5d5d; }
+    .container { max-width: 400px; margin: auto; }
+    h1 { color: #ff8fb1; font-size: 1.8rem; }
+    .card { background: white; padding: 12px; border-radius: 20px; box-shadow: 0 8px 15px rgba(255, 143, 177, 0.1); margin-bottom: 12px; border: 2px solid #ffe4e9; }
+    .btn { width: 100%; font-size: 18px; padding: 18px; background: #87ceeb; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: 700; }
+    .btn.sub { background: #ffb7c5; margin-top: 20px; font-size: 14px; padding: 10px; }
+    .history-card { text-align: left; background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 5px solid #ff8fb1; }
+    .date-title { font-weight: bold; color: #ff8fb1; border-bottom: 1px solid #ffe4e9; margin-bottom: 8px; }
+</style>
+"""
 
 @app.route('/')
 def index():
-    logs = load_logs()  # 保存されたファイルを読み込む
+    logs = load_logs()
     now = datetime.now()
     today = now.strftime("%Y/%m/%d")
     today_logs = [log for log in logs if log['date'] == today]
     taken_names = [log['name'] for log in today_logs]
     all_clear = all(m in taken_names for m in MEDICINES[:3])
     
-    # 頓服の4時間チェック
-    tonpuku_wait_msg = ""
-    can_take_tonpuku = True
-    tonpuku_logs = [l for l in logs if l['name'] == "頓服"]
-    if tonpuku_logs:
-        last_tonpuku = tonpuku_logs[-1]
-        last_time = datetime.strptime(f"{last_tonpuku['date']} {last_tonpuku['time']}", "%Y/%m/%d %H:%M:%S")
-        next_available_time = last_time + timedelta(hours=4)
-        if now < next_available_time:
-            can_take_tonpuku = False
-            remaining = next_available_time - now
-            h, rem = divmod(remaining.seconds, 3600)
-            m, _ = divmod(rem, 60)
-            tonpuku_wait_msg = f"(あと{h}h{m}m)"
+    # 頓服チェック（省略版）
+    tonpuku_wait = ""
+    can_t = True
+    t_logs = [l for l in logs if l['name'] == "頓服"]
+    if t_logs:
+        last = datetime.strptime(f"{t_logs[-1]['date']} {t_logs[-1]['time']}", "%Y/%m/%d %H:%M:%S")
+        if now < last + timedelta(hours=4):
+            can_t = False
+            diff = (last + timedelta(hours=4)) - now
+            tonpuku_wait = f"(あと{diff.seconds//3600}h{(diff.seconds//60)%60}m)"
 
     return render_template_string(f"""
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>薬マネ</title>
-        <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
-        <style>
-            body {{ font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; color: #5d5d5d; -webkit-user-select: none; }}
-            .container {{ max-width: 400px; margin: auto; }}
-            h1 {{ color: #ff8fb1; font-size: 1.8rem; margin: 10px 0; }}
-            .status {{ font-size: 1.1rem; color: #ffb7c5; margin-bottom: 20px; font-weight: bold; min-height: 1.5em; }}
-            .card {{ background: white; padding: 12px; border-radius: 20px; box-shadow: 0 8px 15px rgba(255, 143, 177, 0.1); margin-bottom: 12px; border: 2px solid #ffe4e9; }}
-            .btn {{ 
-                width: 100%; font-size: 18px; padding: 18px; background: #87ceeb; color: white; border: none; 
-                border-radius: 15px; cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700;
-                touch-action: manipulation;
-            }}
-            .btn.done {{ background: #e0e0e0; color: #999; }}
-            .btn.tonpuku {{ background: #ff8fb1; }}
-            .btn.wait {{ background: #f3d1d9; color: #fff; font-size: 14px; }}
-            .log-list {{ text-align: left; background: white; padding: 15px; border-radius: 15px; margin-top: 20px; max-height: 200px; overflow-y: auto; }}
-            .all-clear-msg {{ font-size: 20px; color: #ff6b81; animation: heartBeat 1.5s infinite; }}
-            @keyframes heartBeat {{ 0% {{ transform: scale(1); }} 14% {{ transform: scale(1.1); }} 28% {{ transform: scale(1); }} }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🌸 薬マネ 🌸</h1>
-            <div class="status">
-                {"<div class='all-clear-msg'>💖 朝の分、ばっちり！ 💖</div>" if all_clear else "きょうも ぼちぼち のもうね"}
-            </div>
-
-            {"".join([f'''
-            <div class="card">
-                <form action="/record" method="post">
-                    <input type="hidden" name="med_name" value="{m}">
-                    <button type="button" class="btn {"done" if (m in taken_names and m != "頓服") else ("tonpuku" if (m == "頓服" and can_take_tonpuku) else ("wait" if (m == "頓服" and not can_take_tonpuku) else ""))}"
-                        onmousedown="start_press('{m}')" onmouseup="end_press()"
-                        ontouchstart="start_press('{m}')" ontouchend="end_press()">
-                        {m} {"(済)" if (m in taken_names and m != "頓服") else ""} {tonpuku_wait_msg if (m == "頓服" and not can_take_tonpuku) else ""}
-                    </button>
-                </form>
-            </div>
-            ''' for m in MEDICINES])}
-
-            <div class="log-list">
-                <h3 style="margin:0; color:#ff8fb1; font-size: 1rem;">📝 さいきんのきろく</h3>
-                {"".join([f"<li style='list-style:none; font-size:0.8rem; border-bottom:1px dashed #eee; padding:5px 0;'>✅ {log['date']} {log['time']} - {log['name']}</li>" for log in reversed(logs[:50])])}
-            </div>
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}</head>
+    <body><div class="container">
+        <h1>🌸 薬マネ 🌸</h1>
+        <div style="font-size:1.1rem; color:#ffb7c5; font-weight:bold; margin-bottom:20px;">
+            {"<div style='color:#ff6b81; animation:heartBeat 1.5s infinite;'>💖 全完了！ 💖</div>" if all_clear else "きょうも ぼちぼち のもうね"}
         </div>
+        {"".join([f'<div class="card"><form action="/record" method="post"><input type="hidden" name="med_name" value="{m}"><button type="button" class="btn {"done" if (m in taken_names and m!="頓服") else ("tonpuku" if (m=="頓服" and can_t) else ("wait" if (m=="頓服" and not can_t) else ""))}" onmousedown="start_press(\'{m}\')" onmouseup="end_press()" ontouchstart="start_press(\'{m}\')" ontouchend="end_press()" style="background:{"#e0e0e0" if (m in taken_names and m!="頓服") else ("#ff8fb1" if m=="頓服" and can_t else ("#f3d1d9" if m=="頓服" and not can_t else "#87ceeb"))}">{m} {"(済)" if (m in taken_names and m!="頓服") else ""} {tonpuku_wait if m=="頓服" and not can_t else ""}</button></form></div>' for m in MEDICINES])}
+        <button class="btn sub" onclick="location.href='/history'">📅 1週間のきろくを見る</button>
+    </div>
+    <script>
+        let t; let lp = false;
+        function start_press(n) {{ lp = false; t = setTimeout(() => {{ lp = true; if(confirm(n + " けす？")) location.href="/delete/"+encodeURIComponent(n); }}, 800); }}
+        function end_press() {{ clearTimeout(t); if(!lp) {{ const b = event.currentTarget; if(!b.style.background.includes("rgb(224, 224, 224)") && !b.style.background.includes("rgb(243, 209, 217)")) b.closest('form').submit(); }} }}
+    </script>
+    </body></html>
+    """)
 
-        <script>
-            let timer;
-            let isLongPress = false;
-            function start_press(name) {{
-                isLongPress = false;
-                timer = setTimeout(function() {{
-                    isLongPress = true;
-                    if(confirm(name + " の記録をけす？")) {{ window.location.href = "/delete/" + encodeURIComponent(name); }}
-                }}, 800);
-            }}
-            function end_press() {{
-                clearTimeout(timer);
-                if(!isLongPress) {{
-                    const btn = event.currentTarget;
-                    if(!btn.classList.contains('wait') && !btn.classList.contains('done')) {{ btn.closest('form').submit(); }}
-                }}
-            }}
-            window.oncontextmenu = function(e) {{ e.preventDefault(); return false; }};
-        </script>
-    </body>
-    </html>
+@app.route('/history')
+def history():
+    logs = load_logs()
+    # 過去7日間の日付リストを作成
+    history_data = {}
+    for i in range(7):
+        d = (datetime.now() - timedelta(days=i)).strftime("%Y/%m/%d")
+        history_data[d] = [log for log in logs if log['date'] == d]
+
+    return render_template_string(f"""
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}</head>
+    <body><div class="container">
+        <h1>📅 1週間のきろく</h1>
+        {"".join([f'''
+        <div class="history-card">
+            <div class="date-title">{date}</div>
+            {"".join([f"<div>・{l['time']} {l['name']}</div>" for l in day_logs]) if day_logs else "<div style='color:#ccc;'>記録なし</div>"}
+        </div>
+        ''' for date, day_logs in history_data.items()])}
+        <button class="btn" style="background:#ffb7c5;" onclick="location.href='/'">もどる</button>
+    </div></body></html>
     """)
 
 @app.route('/record', methods=['POST'])
 def record():
-    med_name = request.form.get('med_name')
-    logs = load_logs()
-    now = datetime.now()
-    logs.append({"date": now.strftime("%Y/%m/%d"), "time": now.strftime("%H:%M:%S"), "name": med_name})
-    save_logs(logs) # ファイルに保存！
-    return redirect(url_for('index'))
+    m = request.form.get('med_name'); logs = load_logs()
+    logs.append({"date": datetime.now().strftime("%Y/%m/%d"), "time": datetime.now().strftime("%H:%M:%S"), "name": m})
+    save_logs(logs); return redirect(url_for('index'))
 
 @app.route('/delete/<name>')
 def delete(name):
-    logs = load_logs()
-    today = datetime.now().strftime("%Y/%m/%d")
-    new_logs = []
+    logs = load_logs(); today = datetime.now().strftime("%Y/%m/%d"); new = []
     found = False
-    for log in reversed(logs):
-        if not found and log['name'] == name and log['date'] == today:
-            found = True
-            continue
-        new_logs.append(log)
-    save_logs(list(reversed(new_logs))) # ファイルを更新！
-    return redirect(url_for('index'))
+    for l in reversed(logs):
+        if not found and l['name'] == name and l['date'] == today: found = True; continue
+        new.append(l)
+    save_logs(list(reversed(new))); return redirect(url_for('index'))
 
-if __name__ == '__main__':
-    app.run()
+if __name__ == '__main__': app.run()
