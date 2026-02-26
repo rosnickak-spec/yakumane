@@ -3,9 +3,7 @@ import csv
 from datetime import datetime, timedelta
 from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory
 
-# 1. ここで「app」をしっかり定義します
 app = Flask(__name__)
-
 LOG_FILE = 'logs.csv'
 
 def load_logs():
@@ -20,7 +18,7 @@ def save_logs(logs):
         writer.writeheader()
         writer.writerows(logs)
 
-# お薬の名前（コンサ1 完璧！）
+# お薬の名前
 MEDICINES = ["コンサ1", "コンサ2", "抑肝散", "頓服"]
 
 @app.route('/icon.png')
@@ -64,7 +62,6 @@ def index():
             .card {{ background: white; padding: 12px; border-radius: 20px; box-shadow: 0 8px 15px rgba(255, 143, 177, 0.1); margin-bottom: 12px; border: 2px solid #ffe4e9; }}
             .btn {{ width: 100%; font-size: 18px; padding: 18px; background: #87ceeb; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: 700; touch-action: manipulation; }}
             .btn.sub {{ background: #ffb7c5; margin-top: 20px; font-size: 14px; padding: 10px; }}
-            @keyframes heartBeat {{ 0% {{ transform: scale(1); }} 14% {{ transform: scale(1.1); }} 28% {{ transform: scale(1); }} }}
         </style>
     </head>
     <body>
@@ -139,3 +136,9 @@ def delete(name):
     for l in reversed(logs):
         if not found and l['name'] == name and l['date'] == today: found = True; continue
         new.append(l)
+    save_logs(list(reversed(new))); return redirect(url_for('index'))
+
+# --- ここが最重要：Render専用の起動コード ---
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
