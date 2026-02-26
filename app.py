@@ -1,12 +1,13 @@
-from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory
-from datetime import datetime, timedelta
+import os
 import csv
-import os  # ← これが抜けていると502エラーになります
+from datetime import datetime, timedelta
+from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory
 
+# 1. ここで「app」をしっかり定義します
 app = Flask(__name__)
+
 LOG_FILE = 'logs.csv'
 
-# --- データの読み書き ---
 def load_logs():
     if not os.path.exists(LOG_FILE): return []
     with open(LOG_FILE, 'r', encoding='utf-8') as f:
@@ -19,17 +20,14 @@ def save_logs(logs):
         writer.writeheader()
         writer.writerows(logs)
 
-# お薬の名前
+# お薬の名前（コンサ1 完璧！）
 MEDICINES = ["コンサ1", "コンサ2", "抑肝散", "頓服"]
 
-# --- アイコン画像を返す設定 ---
 @app.route('/icon.png')
 def icon_file():
-    # 画像ファイルがGitHubにアップされていない場合でもエラーにならないようにチェック
     if os.path.exists('icon.png'):
         return send_from_directory(os.getcwd(), 'icon.png')
-    else:
-        return "Icon not found", 404
+    return "Icon not found", 404
 
 @app.route('/')
 def index():
@@ -116,4 +114,28 @@ def history():
     <link rel="apple-touch-icon" href="/icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        body {{ font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0;
+        body {{ font-family: 'Zen Maru Gothic', sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; color: #5d5d5d; }}
+        .container {{ max-width: 400px; margin: auto; }}
+        h1 {{ color: #ff8fb1; font-size: 1.8rem; }}
+        .history-card {{ text-align: left; background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 5px solid #ff8fb1; }}
+        .date-title {{ font-weight: bold; color: #ff8fb1; border-bottom: 1px solid #ffe4e9; margin-bottom: 8px; }}
+        .btn {{ width: 100%; font-size: 18px; padding: 18px; background: #ffb7c5; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: 700; }}
+    </style></head>
+    <body><div class="container"><h1>📅 1週間のきろく</h1>
+    {"".join([f'<div class="history-card"><div class="date-title">{date}</div>{"".join([f"<div>・{l[\'time\']} {l[\'name\']}</div>" for l in day_logs]) if day_logs else "<div style=\'color:#ccc;\'>記録なし</div>"}</div>' for date, day_logs in history_data.items()])}
+    <button class="btn" onclick="location.href='/'">もどる</button></div></body></html>
+    """)
+
+@app.route('/record', methods=['POST'])
+def record():
+    m = request.form.get('med_name'); logs = load_logs()
+    logs.append({"date": datetime.now().strftime("%Y/%m/%d"), "time": datetime.now().strftime("%H:%M:%S"), "name": m})
+    save_logs(logs); return redirect(url_for('index'))
+
+@app.route('/delete/<name>')
+def delete(name):
+    logs = load_logs(); today = datetime.now().strftime("%Y/%m/%d"); new = []
+    found = False
+    for l in reversed(logs):
+        if not found and l['name'] == name and l['date'] == today: found = True; continue
+        new.append(l)
