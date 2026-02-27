@@ -14,7 +14,7 @@ if not firebase_admin._apps:
     # 秘密鍵（json）がリポジトリにある前提です
     cred = credentials.Certificate('firebase_key.json') 
     firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://あなたのプロジェクトID.firebaseio.com/'
+        'databaseURL': 'https://toeic860clear.firebaseio.com/'
     })
 
 def load_logs():
@@ -116,3 +116,4 @@ def record():
     return redirect(url_for('index'))
 
 @app.
+
