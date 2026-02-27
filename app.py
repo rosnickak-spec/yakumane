@@ -69,20 +69,32 @@ def index():
     logs = load_logs()
     now = datetime.now(JST)
     today = now.strftime("%Y/%m/%d")
+    
+    # 修正ポイント：Firestoreのデータから「今日の日付」のものを正確に抜き出す
     today_logs = [log for log in logs if log.get('date') == today]
     taken_names = [log.get('name') for log in today_logs]
+    
+    # コンサ1, 2, 抑肝散が全部「済」かチェック
     all_clear = all(m in taken_names for m in MEDICINES[:3])
     
     tonpuku_wait = ""
     can_t = True
+    # 頓服の待ち時間を計算
     t_logs = [l for l in logs if l.get('name') == "頓服"]
     if t_logs:
-        last = datetime.strptime(f"{t_logs[-1]['date']} {t_logs[-1]['time']}", "%Y/%m/%d %H:%M:%S").replace(tzinfo=JST)
+        # 一番新しい頓服の記録を取得
+        last_log = t_logs[-1]
+        last_time_str = f"{last_log.get('date')} {last_log.get('time')}"
+        last = datetime.strptime(last_time_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=JST)
+        
         if now < last + timedelta(hours=4):
             can_t = False
             diff = (last + timedelta(hours=4)) - now
             tonpuku_wait = f"(あと{diff.seconds//3600}h{(diff.seconds//60)%60}m)"
 
+    # HTMLを返す部分はそのまま（変更なし）
+    return render_template_string(f"""
+    ... (以下略) ...
     return render_template_string(f"""
     <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">{COMMON_STYLE}<link rel="apple-touch-icon" href="/icon.png"></head>
     <body><div class="container">
@@ -131,3 +143,4 @@ if __name__ == '__main__':
     # ローカルでテストする用。Renderを使う場合はこのままGitHubへ。
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
