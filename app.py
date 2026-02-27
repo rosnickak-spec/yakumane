@@ -2,41 +2,49 @@ import os
 from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory
 import firebase_admin
-from firebase_admin import credentials, db
+from firebase_admin import credentials, firestore
 
 app = Flask(__name__)
-
-# 日本時間の定義
 JST = timezone(timedelta(hours=9))
 
-# --- Firebaseの設定 ---
+# --- Firebaseの設定 (Firestore版) ---
 if not firebase_admin._apps:
-    # 秘密鍵（json）がリポジトリにある前提です
-    cred = credentials.Certificate('firebase_key.json') 
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://toeic860clear.firebaseio.com/'
-    })
+    cred = credentials.Certificate('firebase_key.json')
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+# お薬のリスト定義
+MEDICINES = ["コンサ1", "コンサ2", "抑肝散", "頓服"]
 
 def load_logs():
     try:
-        ref = db.reference('logs')
-        logs = ref.get()
-        if not logs: return []
-        # Firebaseのデータをリストに変換
-        return list(logs.values())
+        # 全てのログを日付と時間の昇順で取得
+        docs = db.collection('logs').order_by('date').order_by('time').stream()
+        return [doc.to_dict() for doc in docs]
     except Exception as e:
-        print(f"Firebase Error: {e}")
+        print(f"Load Error: {e}")
         return []
 
 def save_logs(new_log):
-    ref = db.reference('logs')
-    ref.push(new_log)
+    db.collection('logs').add(new_log)
 
-MEDICINES = ["コンサ1", "コンサ2", "抑肝散", "頓服"]
-
-@app.route('/icon.png')
-def icon_file():
-    return send_from_directory(os.getcwd(), 'icon.png')
+@app.route('/delete/<name>')
+def delete(name):
+    try:
+        now = datetime.now(JST)
+        today = now.strftime("%Y/%m/%d")
+        docs = db.collection('logs')\
+                 .where('name', '==', name)\
+                 .where('date', '==', today)\
+                 .order_by('time', direction=firestore.Query.DESCENDING)\
+                 .limit(1).get()
+        
+        for doc in docs:
+            doc.reference.delete()
+    except Exception as e:
+        print(f"Delete error: {e}")
+    return redirect(url_for('index'))
 
 COMMON_STYLE = """
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
@@ -51,6 +59,10 @@ COMMON_STYLE = """
     .date-title { font-weight: bold; color: #ff8fb1; border-bottom: 1px solid #ffe4e9; margin-bottom: 8px; }
 </style>
 """
+
+@app.route('/icon.png')
+def icon_file():
+    return send_from_directory(os.getcwd(), 'icon.png')
 
 @app.route('/')
 def index():
@@ -115,5 +127,7 @@ def record():
     save_logs(new_log)
     return redirect(url_for('index'))
 
-@app.
-
+if __name__ == '__main__':
+    # ローカルでテストする用。Renderを使う場合はこのままGitHubへ。
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
