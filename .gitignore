@@ -1,0 +1,17 @@
+# Firebase / Google Cloud secrets
+firebase_key.json
+serviceAccountKey.json
+*.json
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# OS
+.DS_Store
