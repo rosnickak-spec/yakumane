@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <title>🌸 薬マネ 🌸</title>
@@ -59,21 +60,10 @@ font-weight:bold;
 color:white;
 }
 
-.normal{
-background:#87ceeb;
-}
-
-.done{
-background:#e0e0e0;
-}
-
-.tonpuku{
-background:#ff8fb1;
-}
-
-.disabled{
-background:#f3d1d9;
-}
+.normal{background:#87ceeb;}
+.done{background:#e0e0e0;}
+.tonpuku{background:#ff8fb1;}
+.disabled{background:#f3d1d9;}
 
 .sub{
 background:#ffb7c5;
@@ -85,6 +75,7 @@ font-size:14px;
 .nav{
 display:flex;
 justify-content:space-between;
+align-items:center;
 margin:10px;
 }
 
@@ -141,17 +132,29 @@ const MEDICINES=["コンサ1","コンサ2","抑肝散","頓服"];
 
 let page=0;
 
+
+
+// ---------- 保存 ----------
 function getLogs(){
 return JSON.parse(localStorage.getItem("yakumane_logs")||"[]");
 }
 
 function save(name){
 
+const now=new Date();
+
 const logs=getLogs();
 
 logs.push({
-name,
-timestamp:Date.now()
+
+name:name,
+
+date:now.toLocaleDateString('ja-JP'),
+
+time:now.toLocaleTimeString('ja-JP',{hour12:false}),
+
+timestamp:now.getTime()
+
 });
 
 localStorage.setItem("yakumane_logs",JSON.stringify(logs));
@@ -160,15 +163,50 @@ render();
 
 }
 
+
+
+// ---------- 長押しメニュー ----------
+function longPressMenu(name){
+
+const action=prompt(
+
+name+
+
+"\n\n1 → 削除"+
+
+"\n2 → 時間変更"+
+
+"\n\n数字入力"
+
+);
+
+if(action==="1") deleteRecent(name);
+
+if(action==="2") changeTime(name);
+
+}
+
+
+
+// ---------- 削除 ----------
 function deleteRecent(name){
 
 let logs=getLogs();
 
+const today=new Date().toLocaleDateString();
+
 for(let i=logs.length-1;i>=0;i--){
 
-if(logs[i].name===name){
+if(
+
+logs[i].name===name &&
+
+new Date(logs[i].timestamp).toLocaleDateString()==today
+
+){
 
 logs.splice(i,1);
+
 break;
 
 }
@@ -181,6 +219,76 @@ render();
 
 }
 
+
+
+// ---------- 時間変更 ----------
+function changeTime(name){
+
+let logs=getLogs();
+
+const today=new Date().toLocaleDateString();
+
+let index=-1;
+
+for(let i=logs.length-1;i>=0;i--){
+
+if(
+
+logs[i].name===name &&
+
+new Date(logs[i].timestamp).toLocaleDateString()==today
+
+){
+
+index=i;
+
+break;
+
+}
+
+}
+
+if(index==-1){
+
+alert("今日の記録なし");
+
+return;
+
+}
+
+const newTime=prompt("新しい時間\n例 08:30");
+
+if(!newTime)return;
+
+const parts=newTime.split(":");
+
+if(parts.length!=2){
+
+alert("形式エラー");
+
+return;
+
+}
+
+const d=new Date(logs[index].timestamp);
+
+d.setHours(parts[0]);
+
+d.setMinutes(parts[1]);
+
+logs[index].timestamp=d.getTime();
+
+logs[index].time=newTime+":00";
+
+localStorage.setItem("yakumane_logs",JSON.stringify(logs));
+
+render();
+
+}
+
+
+
+// ---------- メイン描画 ----------
 function render(){
 
 const logs=getLogs();
@@ -195,22 +303,20 @@ const allDone=["コンサ1","コンサ2","抑肝散"]
 .every(m=>taken.includes(m));
 
 document.getElementById("status").innerText=
+
 allDone?"💖 全完了！":"きょうも ぼちぼち のもうね";
 
-const list=document.getElementById("list");
 
-list.innerHTML="";
 
 let canTonpuku=true;
+
 let waitText="";
 
 const ton=logs.filter(l=>l.name=="頓服");
 
 if(ton.length){
 
-const last=ton[ton.length-1].timestamp;
-
-const diff=Date.now()-last;
+const diff=Date.now()-ton[ton.length-1].timestamp;
 
 if(diff<14400000){
 
@@ -219,6 +325,7 @@ canTonpuku=false;
 const rem=14400000-diff;
 
 const h=Math.floor(rem/3600000);
+
 const m=Math.floor(rem%3600000/60000);
 
 waitText=` (${h}h${m}m)`;
@@ -227,10 +334,21 @@ waitText=` (${h}h${m}m)`;
 
 }
 
+
+
+const list=document.getElementById("list");
+
+list.innerHTML="";
+
+
+
 MEDICINES.forEach(m=>{
 
 const card=document.createElement("div");
+
 card.className="card";
+
+
 
 const btn=document.createElement("button");
 
@@ -244,15 +362,31 @@ btn.className="btn "+cls;
 
 btn.innerText=m+(m=="頓服"?waitText:"");
 
+
+
 btn.onclick=()=>{
+
 if(m!="頓服"||canTonpuku)
+
 save(m);
+
 };
+
+
 
 let timer;
 
-btn.onmousedown=()=>timer=setTimeout(()=>deleteRecent(m),800);
+
+
+btn.onmousedown=()=>timer=setTimeout(()=>longPressMenu(m),800);
+
 btn.onmouseup=()=>clearTimeout(timer);
+
+btn.ontouchstart=()=>timer=setTimeout(()=>longPressMenu(m),800);
+
+btn.ontouchend=()=>clearTimeout(timer);
+
+
 
 card.appendChild(btn);
 
@@ -262,9 +396,13 @@ list.appendChild(card);
 
 }
 
+
+
+// ---------- 履歴 ----------
 function showHistory(){
 
 document.getElementById("main").style.display="none";
+
 document.getElementById("history").style.display="block";
 
 renderHistory();
@@ -274,9 +412,12 @@ renderHistory();
 function showMain(){
 
 document.getElementById("main").style.display="block";
+
 document.getElementById("history").style.display="none";
 
 }
+
+
 
 function renderHistory(){
 
@@ -286,12 +427,19 @@ const list=document.getElementById("historyList");
 
 list.innerHTML="";
 
+
+
 const start=page*7;
 
 const end=start+7;
 
+
+
 document.getElementById("pageLabel").innerText=
+
 (start+1)+"〜"+end+"日前";
+
+
 
 for(let i=start;i<end;i++){
 
@@ -301,9 +449,15 @@ d.setDate(d.getDate()-i);
 
 const ds=d.toLocaleDateString();
 
+
+
 const day=logs.filter(l=>
+
 new Date(l.timestamp).toLocaleDateString()==ds
+
 );
+
+
 
 const div=document.createElement("div");
 
@@ -311,10 +465,23 @@ div.className="history-card";
 
 div.innerHTML="<b>"+ds+"</b><br>";
 
+
+
+if(day.length==0)
+
+div.innerHTML+="記録なし";
+
+
+
 day.forEach(l=>{
+
 div.innerHTML+=
-new Date(l.timestamp).toLocaleTimeString()+" "+l.name+"<br>";
+
+l.time+" "+l.name+"<br>";
+
 });
+
+
 
 list.appendChild(div);
 
@@ -322,17 +489,31 @@ list.appendChild(div);
 
 }
 
+
+
 function nextPage(){
+
 page++;
+
 renderHistory();
+
 }
 
+
+
 function prevPage(){
+
 if(page>0){
+
 page--;
+
 renderHistory();
+
 }
+
 }
+
+
 
 render();
 
