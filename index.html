@@ -2,466 +2,193 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🌸 薬マネ 🌸</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>薬マネ</title>
 
-  <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS用 -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="薬マネ">
+
+<!-- 色 -->
+<meta name="theme-color" content="#ff8fb1">
 
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-
-body{
-font-family:'Zen Maru Gothic',sans-serif;
-text-align:center;
-background:#fff5f7;
-margin:0;
-padding:20px;
-color:#5d5d5d;
+body {
+ font-family: 'Zen Maru Gothic', sans-serif;
+ background: #fff5f7;
+ margin:0;
+ padding:20px;
+ text-align:center;
+ color:#555;
 }
 
 .container{
-max-width:400px;
-margin:auto;
+ max-width:400px;
+ margin:auto;
 }
 
 h1{
-color:#ff8fb1;
-}
-
-.status-msg{
-font-size:1.1rem;
-color:#ffb7c5;
-font-weight:bold;
-margin-bottom:20px;
+ color:#ff8fb1;
 }
 
 .card{
-background:white;
-padding:12px;
-border-radius:20px;
-box-shadow:0 8px 15px rgba(255,143,177,0.1);
-margin-bottom:12px;
-border:2px solid #ffe4e9;
+ background:white;
+ padding:12px;
+ margin:10px;
+ border-radius:16px;
 }
 
-.btn{
-width:100%;
-font-size:18px;
-padding:18px;
-color:white;
-border:none;
-border-radius:15px;
-cursor:pointer;
-font-weight:700;
-margin-top:5px;
+button{
+ width:100%;
+ padding:16px;
+ font-size:18px;
+ border:none;
+ border-radius:12px;
+ background:#ff8fb1;
+ color:white;
 }
 
-.btn:active{
-transform:scale(0.98);
-opacity:0.8;
+.done{
+ background:#ccc;
 }
 
-.btn.sub{
-background:#ffb7c5;
-font-size:14px;
-padding:10px;
+.sub{
+ background:#ffb7c5;
+ margin-top:20px;
 }
-
-.nav{
-margin-top:20px;
-display:flex;
-gap:10px;
-}
-
-#history-page{
-display:none;
-}
-
-.history-card{
-background:white;
-margin-bottom:15px;
-padding:15px;
-border-radius:20px;
-text-align:left;
-border-left:8px solid #ffb7c5;
-}
-
 </style>
-</head>
 
+</head>
 <body>
 
-
-<div id="main-page" class="container">
+<div class="container">
 
 <h1>🌸 薬マネ 🌸</h1>
 
-<div id="status-msg" class="status-msg">
-読み込み中...
-</div>
+<div id="status"></div>
 
-<div id="medicine-list"></div>
+<div id="list"></div>
 
-<button class="btn sub" onclick="showHistory(0)">
-📅 履歴を見る
-</button>
+<button class="sub" onclick="showHistory()">履歴</button>
 
-</div>
+<div id="history" style="display:none"></div>
 
-
-
-<div id="history-page" class="container">
-
-<h1>📅 履歴</h1>
-
-<div id="history-list"></div>
-
-<div class="nav">
-
-<button id="newer-btn" class="btn sub">
-← 新しい
-</button>
-
-<button id="older-btn" class="btn sub">
-古い →
-</button>
+<button class="sub" onclick="showMain()" id="back" style="display:none">戻る</button>
 
 </div>
-
-<button class="btn sub" onclick="showMain()">
-メインにもどる
-</button>
-
-</div>
-
-
 
 <script>
 
-
 const MEDICINES=["コンサ1","コンサ2","抑肝散","頓服"];
 
-const DAYS_PER_PAGE=7;
-
-let historyPage=0;
-
-
-
 function getLogs(){
-
-const data=localStorage.getItem("yakumane_logs");
-
-return data?JSON.parse(data):[];
-
+ return JSON.parse(localStorage.getItem("logs")||"[]");
 }
 
+function save(name){
 
+ const now=new Date();
 
-function saveLogs(logs){
+ const log={
+ name,
+ time:now.toLocaleString(),
+ ts:now.getTime()
+ };
 
-localStorage.setItem("yakumane_logs",JSON.stringify(logs));
+ const logs=getLogs();
 
+ logs.push(log);
+
+ localStorage.setItem("logs",JSON.stringify(logs));
+
+ render();
 }
-
-
-
-function saveLog(name){
-
-const now=new Date();
-
-const date=now.toLocaleDateString('ja-JP').replaceAll('-','/');
-
-const time=now.toLocaleTimeString('ja-JP',{hour12:false});
-
-const logs=getLogs();
-
-logs.push({
-
-name,
-
-date,
-
-time,
-
-timestamp:now.getTime()
-
-});
-
-saveLogs(logs);
-
-render();
-
-}
-
-
-
-function deleteRecent(name){
-
-const today=new Date().toLocaleDateString('ja-JP').replaceAll('-','/');
-
-let logs=getLogs();
-
-const index=logs.findLastIndex(
-
-l=>l.name===name && l.date===today
-
-);
-
-if(index!=-1){
-
-if(confirm(name+" を削除しますか？")){
-
-logs.splice(index,1);
-
-saveLogs(logs);
-
-render();
-
-}
-
-}
-
-}
-
-
 
 function render(){
 
-const logs=getLogs();
+ const logs=getLogs();
 
-const today=new Date().toLocaleDateString('ja-JP').replaceAll('-','/');
+ const today=new Date().toLocaleDateString();
 
-const todayLogs=logs.filter(l=>l.date===today);
+ const taken=logs
+ .filter(l=>new Date(l.ts).toLocaleDateString()==today)
+ .map(l=>l.name);
 
-const taken=todayLogs.map(l=>l.name);
+ const list=document.getElementById("list");
 
+ list.innerHTML="";
 
+ MEDICINES.forEach(m=>{
 
-const allClear=MEDICINES.slice(0,3)
+ const btn=document.createElement("button");
 
-.every(m=>taken.includes(m));
+ btn.innerText=m;
 
+ if(taken.includes(m)){
+ btn.className="done";
+ }
 
+ btn.onclick=()=>save(m);
 
-document.getElementById("status-msg").innerHTML=
+ const card=document.createElement("div");
 
-allClear
+ card.className="card";
 
-?"💖 全完了！ 💖"
+ card.appendChild(btn);
 
-:"きょうも ぼちぼち のもうね";
+ list.appendChild(card);
 
-
-
-let canTonpuku=true;
-
-let waitText="";
-
-
-
-const tLogs=logs.filter(l=>l.name==="頓服");
-
-if(tLogs.length>0){
-
-const last=tLogs[tLogs.length-1].timestamp;
-
-const diff=Date.now()-last;
-
-const wait=4*60*60*1000;
-
-if(diff<wait){
-
-canTonpuku=false;
-
-const remain=wait-diff;
-
-const h=Math.floor(remain/3600000);
-
-const m=Math.floor((remain%3600000)/60000);
-
-waitText=` (あと${h}h${m}m)`;
+ });
 
 }
 
-}
+function showHistory(){
 
+ document.getElementById("list").style.display="none";
 
+ document.getElementById("history").style.display="block";
 
-const list=document.getElementById("medicine-list");
+ document.getElementById("back").style.display="block";
 
-list.innerHTML="";
+ const logs=getLogs().reverse();
 
+ const div=document.getElementById("history");
 
+ div.innerHTML="";
 
-MEDICINES.forEach(m=>{
+ logs.forEach(l=>{
 
-const isTaken=(m!="頓服" && taken.includes(m));
+ const d=document.createElement("div");
 
-let color="#87ceeb";
+ d.className="card";
 
-if(isTaken)color="#e0e0e0";
+ d.innerText=l.time+" "+l.name;
 
-if(m=="頓服")color=canTonpuku?"#ff8fb1":"#f3d1d9";
+ div.appendChild(d);
 
-
-
-const card=document.createElement("div");
-
-card.className="card";
-
-
-
-const btn=document.createElement("button");
-
-btn.className="btn";
-
-btn.style.background=color;
-
-btn.innerText=m+
-
-(isTaken?" (済)":"")+
-
-(m=="頓服"?waitText:"");
-
-
-
-let timer;
-
-btn.onmousedown=btn.ontouchstart=()=>{
-
-timer=setTimeout(()=>deleteRecent(m),800);
-
-};
-
-btn.onmouseup=btn.ontouchend=()=>clearTimeout(timer);
-
-
-
-btn.onclick=()=>{
-
-if(!isTaken && (m!="頓服"||canTonpuku)){
-
-saveLog(m);
+ });
 
 }
-
-};
-
-
-
-card.appendChild(btn);
-
-list.appendChild(card);
-
-});
-
-}
-
-
-
-function showHistory(page){
-
-historyPage=page;
-
-document.getElementById("main-page").style.display="none";
-
-document.getElementById("history-page").style.display="block";
-
-
-
-const logs=getLogs();
-
-const list=document.getElementById("history-list");
-
-list.innerHTML="";
-
-
-
-const dates=[...new Set(logs.map(l=>l.date))].reverse();
-
-
-
-const start=page*DAYS_PER_PAGE;
-
-const end=start+DAYS_PER_PAGE;
-
-const pageDates=dates.slice(start,end);
-
-
-
-pageDates.forEach(date=>{
-
-const dayLogs=logs.filter(l=>l.date==date);
-
-let html=
-
-`<div class="history-card">
-
-<b style="color:#ff8fb1">${date}</b>`;
-
-
-
-dayLogs.forEach(l=>{
-
-html+=`<div>・${l.time} ${l.name}</div>`;
-
-});
-
-
-
-html+="</div>";
-
-list.innerHTML+=html;
-
-});
-
-
-
-document.getElementById("newer-btn").style.display=
-
-page>0?"block":"none";
-
-
-
-document.getElementById("older-btn").style.display=
-
-end<dates.length?"block":"none";
-
-
-
-document.getElementById("newer-btn").onclick=
-
-()=>showHistory(page-1);
-
-
-
-document.getElementById("older-btn").onclick=
-
-()=>showHistory(page+1);
-
-}
-
-
 
 function showMain(){
 
-document.getElementById("main-page").style.display="block";
+ document.getElementById("list").style.display="block";
 
-document.getElementById("history-page").style.display="none";
+ document.getElementById("history").style.display="none";
+
+ document.getElementById("back").style.display="none";
 
 }
 
-
-
 render();
-
-setInterval(render,60000);
-
 
 </script>
 
 </body>
 </html>
-
