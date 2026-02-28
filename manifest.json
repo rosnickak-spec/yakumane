@@ -1,6 +1,6 @@
 {
-  "name": "薬マネ",
-  "short_name": "薬マネ",
+  "name": "🌸 薬マネ 🌸",
+"short_name": "薬マネ",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#fff5f7",
@@ -17,4 +17,5 @@
       "type": "image/png"
     }
   ]
+
 }
