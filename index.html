@@ -2,191 +2,341 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>薬マネ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>🌸 薬マネ 🌸</title>
 
 <link rel="manifest" href="manifest.json">
-
-<!-- iOS用 -->
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="薬マネ">
 
-<!-- 色 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#ff8fb1">
 
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-body {
- font-family: 'Zen Maru Gothic', sans-serif;
- background: #fff5f7;
- margin:0;
- padding:20px;
- text-align:center;
- color:#555;
+
+body{
+font-family:'Zen Maru Gothic',sans-serif;
+background:#fff5f7;
+color:#5d5d5d;
+margin:0;
+padding:20px;
+text-align:center;
 }
 
 .container{
- max-width:400px;
- margin:auto;
+max-width:400px;
+margin:auto;
 }
 
 h1{
- color:#ff8fb1;
+color:#ff8fb1;
+}
+
+.status{
+color:#ff8fb1;
+margin-bottom:10px;
+font-weight:bold;
 }
 
 .card{
- background:white;
- padding:12px;
- margin:10px;
- border-radius:16px;
+background:white;
+padding:12px;
+margin-bottom:12px;
+border-radius:20px;
+box-shadow:0 4px 10px rgba(255,143,177,0.2);
+border:2px solid #ffe4e9;
 }
 
-button{
- width:100%;
- padding:16px;
- font-size:18px;
- border:none;
- border-radius:12px;
- background:#ff8fb1;
- color:white;
+.btn{
+width:100%;
+padding:18px;
+border:none;
+border-radius:15px;
+font-size:18px;
+font-weight:bold;
+color:white;
+}
+
+.normal{
+background:#87ceeb;
 }
 
 .done{
- background:#ccc;
+background:#e0e0e0;
+}
+
+.tonpuku{
+background:#ff8fb1;
+}
+
+.disabled{
+background:#f3d1d9;
 }
 
 .sub{
- background:#ffb7c5;
- margin-top:20px;
+background:#ffb7c5;
+margin-top:10px;
+padding:10px;
+font-size:14px;
 }
-</style>
 
+.nav{
+display:flex;
+justify-content:space-between;
+margin:10px;
+}
+
+.history-card{
+background:white;
+padding:10px;
+margin-bottom:10px;
+border-radius:15px;
+text-align:left;
+border-left:6px solid #ffb7c5;
+}
+
+</style>
 </head>
 <body>
 
-<div class="container">
+<div id="main" class="container">
 
 <h1>🌸 薬マネ 🌸</h1>
 
-<div id="status"></div>
+<div id="status" class="status"></div>
 
 <div id="list"></div>
 
-<button class="sub" onclick="showHistory()">履歴</button>
-
-<div id="history" style="display:none"></div>
-
-<button class="sub" onclick="showMain()" id="back" style="display:none">戻る</button>
+<button class="btn sub" onclick="showHistory()">📅 履歴</button>
 
 </div>
+
+
+<div id="history" class="container" style="display:none;">
+
+<h1>📅 履歴</h1>
+
+<div class="nav">
+
+<button class="btn sub" onclick="prevPage()">← 新しい</button>
+
+<div id="pageLabel"></div>
+
+<button class="btn sub" onclick="nextPage()">古い →</button>
+
+</div>
+
+<div id="historyList"></div>
+
+<button class="btn sub" onclick="showMain()">戻る</button>
+
+</div>
+
 
 <script>
 
 const MEDICINES=["コンサ1","コンサ2","抑肝散","頓服"];
 
+let page=0;
+
 function getLogs(){
- return JSON.parse(localStorage.getItem("logs")||"[]");
+return JSON.parse(localStorage.getItem("yakumane_logs")||"[]");
 }
 
 function save(name){
 
- const now=new Date();
+const logs=getLogs();
 
- const log={
- name,
- time:now.toLocaleString(),
- ts:now.getTime()
- };
+logs.push({
+name,
+timestamp:Date.now()
+});
 
- const logs=getLogs();
+localStorage.setItem("yakumane_logs",JSON.stringify(logs));
 
- logs.push(log);
+render();
 
- localStorage.setItem("logs",JSON.stringify(logs));
+}
 
- render();
+function deleteRecent(name){
+
+let logs=getLogs();
+
+for(let i=logs.length-1;i>=0;i--){
+
+if(logs[i].name===name){
+
+logs.splice(i,1);
+break;
+
+}
+
+}
+
+localStorage.setItem("yakumane_logs",JSON.stringify(logs));
+
+render();
+
 }
 
 function render(){
 
- const logs=getLogs();
+const logs=getLogs();
 
- const today=new Date().toLocaleDateString();
+const today=new Date().toLocaleDateString();
 
- const taken=logs
- .filter(l=>new Date(l.ts).toLocaleDateString()==today)
- .map(l=>l.name);
+const taken=logs
+.filter(l=>new Date(l.timestamp).toLocaleDateString()==today)
+.map(l=>l.name);
 
- const list=document.getElementById("list");
+const allDone=["コンサ1","コンサ2","抑肝散"]
+.every(m=>taken.includes(m));
 
- list.innerHTML="";
+document.getElementById("status").innerText=
+allDone?"💖 全完了！":"きょうも ぼちぼち のもうね";
 
- MEDICINES.forEach(m=>{
+const list=document.getElementById("list");
 
- const btn=document.createElement("button");
+list.innerHTML="";
 
- btn.innerText=m;
+let canTonpuku=true;
+let waitText="";
 
- if(taken.includes(m)){
- btn.className="done";
- }
+const ton=logs.filter(l=>l.name=="頓服");
 
- btn.onclick=()=>save(m);
+if(ton.length){
 
- const card=document.createElement("div");
+const last=ton[ton.length-1].timestamp;
 
- card.className="card";
+const diff=Date.now()-last;
 
- card.appendChild(btn);
+if(diff<14400000){
 
- list.appendChild(card);
+canTonpuku=false;
 
- });
+const rem=14400000-diff;
+
+const h=Math.floor(rem/3600000);
+const m=Math.floor(rem%3600000/60000);
+
+waitText=` (${h}h${m}m)`;
+
+}
+
+}
+
+MEDICINES.forEach(m=>{
+
+const card=document.createElement("div");
+card.className="card";
+
+const btn=document.createElement("button");
+
+let cls="normal";
+
+if(m!="頓服"&&taken.includes(m))cls="done";
+
+if(m=="頓服")cls=canTonpuku?"tonpuku":"disabled";
+
+btn.className="btn "+cls;
+
+btn.innerText=m+(m=="頓服"?waitText:"");
+
+btn.onclick=()=>{
+if(m!="頓服"||canTonpuku)
+save(m);
+};
+
+let timer;
+
+btn.onmousedown=()=>timer=setTimeout(()=>deleteRecent(m),800);
+btn.onmouseup=()=>clearTimeout(timer);
+
+card.appendChild(btn);
+
+list.appendChild(card);
+
+});
 
 }
 
 function showHistory(){
 
- document.getElementById("list").style.display="none";
+document.getElementById("main").style.display="none";
+document.getElementById("history").style.display="block";
 
- document.getElementById("history").style.display="block";
-
- document.getElementById("back").style.display="block";
-
- const logs=getLogs().reverse();
-
- const div=document.getElementById("history");
-
- div.innerHTML="";
-
- logs.forEach(l=>{
-
- const d=document.createElement("div");
-
- d.className="card";
-
- d.innerText=l.time+" "+l.name;
-
- div.appendChild(d);
-
- });
+renderHistory();
 
 }
 
 function showMain(){
 
- document.getElementById("list").style.display="block";
-
- document.getElementById("history").style.display="none";
-
- document.getElementById("back").style.display="none";
+document.getElementById("main").style.display="block";
+document.getElementById("history").style.display="none";
 
 }
 
+function renderHistory(){
+
+const logs=getLogs();
+
+const list=document.getElementById("historyList");
+
+list.innerHTML="";
+
+const start=page*7;
+
+const end=start+7;
+
+document.getElementById("pageLabel").innerText=
+(start+1)+"〜"+end+"日前";
+
+for(let i=start;i<end;i++){
+
+const d=new Date();
+
+d.setDate(d.getDate()-i);
+
+const ds=d.toLocaleDateString();
+
+const day=logs.filter(l=>
+new Date(l.timestamp).toLocaleDateString()==ds
+);
+
+const div=document.createElement("div");
+
+div.className="history-card";
+
+div.innerHTML="<b>"+ds+"</b><br>";
+
+day.forEach(l=>{
+div.innerHTML+=
+new Date(l.timestamp).toLocaleTimeString()+" "+l.name+"<br>";
+});
+
+list.appendChild(div);
+
+}
+
+}
+
+function nextPage(){
+page++;
+renderHistory();
+}
+
+function prevPage(){
+if(page>0){
+page--;
+renderHistory();
+}
+}
+
 render();
+
+setInterval(render,60000);
 
 </script>
 
